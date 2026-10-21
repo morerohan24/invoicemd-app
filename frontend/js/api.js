@@ -3,7 +3,7 @@
 const API_BASE =
   window.location.hostname === "localhost"
     ? "http://localhost:5000/api"
-    : "https://invoice-md-backend.vercel.app/api";
+    : "https://invoicemd-backend-v2.vercel.app";
 
 const Api = {
   token: localStorage.getItem("invoicemd_token") || null,
