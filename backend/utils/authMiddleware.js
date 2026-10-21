@@ -1,6 +1,10 @@
 const jwt = require("jsonwebtoken");
 
-const JWT_SECRET = process.env.JWT_SECRET || "dev_secret_change_me";
+if (!process.env.JWT_SECRET) {
+  throw new Error("JWT_SECRET is missing from environment variables");
+}
+
+const JWT_SECRET = process.env.JWT_SECRET;
 
 function authMiddleware(req, res, next) {
   const header = req.headers.authorization || "";

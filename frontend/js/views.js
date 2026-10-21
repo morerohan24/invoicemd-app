@@ -48,12 +48,6 @@ function whatsappLink(inv, kind) {
   return `https://wa.me/?text=${encodeURIComponent(message)}`;
 }
 
-function prescriptionWhatsappLink(p) {
-  const medList = p.medicines.map((m) => `- ${m.name}${m.dosage ? ` (${m.dosage})` : ""}${m.frequency ? `, ${m.frequency}` : ""}`).join("\n");
-  const message = `Prescription ${p.prescriptionNumber} for ${p.patientName} — ${new Date(p.date).toLocaleDateString("en-IN")}\n\n${medList}${p.advice ? `\n\nAdvice: ${p.advice}` : ""}${p.followUpDate ? `\nFollow-up: ${new Date(p.followUpDate).toLocaleDateString("en-IN")}` : ""}`;
-  return `https://wa.me/?text=${encodeURIComponent(message)}`;
-}
-
 /* ---------------- Auth views ---------------- */
 
 function viewLogin(s) {
@@ -711,7 +705,14 @@ function viewPrescriptions(s) {
       </td>
       <td class="actions-cell">
         <button class="btn btn-ghost btn-sm" data-view-prescription="${p.id}" title="View">${Icon.eye}</button>
-        <a class="btn btn-whatsapp btn-sm" href="${prescriptionWhatsappLink(p)}" target="_blank" rel="noopener" title="Share on WhatsApp">${Icon.whatsapp}</a>
+        <button
+          type="button"
+          class="btn btn-whatsapp btn-sm"
+          data-share-prescription="${p.id}"
+          data-filename="${p.prescriptionNumber}.pdf"
+          data-patient="${p.patientName}"
+          title="Send prescription PDF on WhatsApp"
+        >${Icon.whatsapp}</button>
         <button class="btn btn-ghost btn-sm" data-download-prescription="${p.id}" data-filename="${p.prescriptionNumber}.pdf" title="Download PDF">${Icon.download}</button>
         <button class="btn btn-danger btn-sm" data-delete-prescription="${p.id}" data-prescription-number="${p.prescriptionNumber}" title="Delete">${Icon.trash}</button>
       </td>
@@ -787,7 +788,13 @@ function viewPrescriptionModal(s) {
       </div>
       <div class="modal-footer">
         ${p.payment.status === "pending" ? `<button class="btn btn-soft btn-sm" data-record-payment="${p.id}" data-payment-label="${p.prescriptionNumber}" data-payment-amount="${p.consultationFee}">Record payment</button>` : ""}
-        <a class="btn btn-whatsapp btn-sm" href="${prescriptionWhatsappLink(p)}" target="_blank" rel="noopener">${Icon.whatsapp} WhatsApp</a>
+        <button
+          type="button"
+          class="btn btn-whatsapp btn-sm"
+          data-share-prescription="${p.id}"
+          data-filename="${p.prescriptionNumber}.pdf"
+          data-patient="${p.patientName}"
+        >${Icon.whatsapp} WhatsApp</button>
         <button class="btn btn-ghost btn-sm" data-download-prescription="${p.id}" data-filename="${p.prescriptionNumber}.pdf">${Icon.download} Download PDF</button>
         <button class="btn btn-primary btn-sm" id="close-prescription-modal-secondary">Close</button>
       </div>

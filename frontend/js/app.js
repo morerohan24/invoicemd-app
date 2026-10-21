@@ -253,6 +253,47 @@ root.addEventListener("click", async (e) => {
     State.set({ viewingPrescriptionId: null });
   }
 
+  const rxShareBtn = e.target.closest("[data-share-prescription]");
+  if (rxShareBtn) {
+    const id = rxShareBtn.getAttribute("data-share-prescription");
+    const filename = rxShareBtn.getAttribute("data-filename") || "prescription.pdf";
+    const patientName = rxShareBtn.getAttribute("data-patient") || "Patient";
+    const originalHtml = rxShareBtn.innerHTML;
+
+    rxShareBtn.innerHTML = "Preparing PDF…";
+    rxShareBtn.disabled = true;
+
+    try {
+      const file = await Api.getPrescriptionPdf(id, filename);
+
+      if (
+        !navigator.share ||
+        !navigator.canShare ||
+        !navigator.canShare({ files: [file] })
+      ) {
+        throw new Error(
+          "Direct PDF sharing is not supported on this device/browser. Please use Download PDF."
+        );
+      }
+
+      await navigator.share({
+        files: [file],
+        title: `Prescription ${filename.replace(/\.pdf$/i, "")}`,
+        text: `Prescription for ${patientName}`
+      });
+    } catch (err) {
+      if (err.name === "AbortError") return;
+
+      console.error("Prescription PDF sharing failed:", err);
+      showToast(err.message || "Could not share prescription PDF", true);
+    } finally {
+      rxShareBtn.innerHTML = originalHtml;
+      rxShareBtn.disabled = false;
+    }
+
+    return;
+  }
+
   const rxDownloadBtn = e.target.closest("[data-download-prescription]");
   if (rxDownloadBtn) {
     const id = rxDownloadBtn.getAttribute("data-download-prescription");
