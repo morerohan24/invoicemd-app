@@ -1,7 +1,8 @@
+
 {
   "name": "doctor-invoice-backend",
   "version": "1.0.0",
-  "description": "Backend API for the Doctor Invoice Acceptance Platform",
+  "description": "Backend API for the InvoiceMD application",
   "main": "server.js",
   "type": "commonjs",
   "scripts": {

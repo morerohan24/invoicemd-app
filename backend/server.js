@@ -1,8 +1,8 @@
+
 require("dotenv").config();
-const path = require("path");
+
 const express = require("express");
 const cors = require("cors");
-const bodyParser = require("body-parser");
 
 const { connectDB } = require("./config/db");
 const { seedHospitals } = require("./config/seed");
@@ -13,56 +13,127 @@ const invoiceRoutes = require("./routes/invoices");
 const prescriptionRoutes = require("./routes/prescriptions");
 
 const app = express();
-const PORT = process.env.PORT || 5000;
 
-app.use(cors());
-app.use(bodyParser.json());
+app.use(
+  cors({
+    origin: process.env.FRONTEND_URL
+      ? process.env.FRONTEND_URL.split(",").map((url) => url.trim())
+      : true,
+  })
+);
 
-// API routes
+app.use(express.json({ limit: "1mb" }));
+
+// Health endpoint: does not require a database connection.
+app.get("/api/health", (req, res) => {
+  res.status(200).json({
+    status: "ok",
+    time: new Date().toISOString(),
+  });
+});
+
+// Initialize the database once per warm server instance.
+let initializationPromise;
+
+function initializeDatabase() {
+  if (!initializationPromise) {
+    initializationPromise = (async () => {
+      await connectDB();
+      await seedHospitals();
+    })().catch((error) => {
+      // Allow a later request to retry initialization.
+      initializationPromise = null;
+      throw error;
+    });
+  }
+
+  return initializationPromise;
+}
+
+// Database-dependent API routes.
+app.use(async (req, res, next) => {
+  if (!req.path.startsWith("/api/")) {
+    return next();
+  }
+
+  if (req.path === "/api/health") {
+    return next();
+  }
+
+  try {
+    await initializeDatabase();
+    next();
+  } catch (error) {
+    console.error("Database initialization failed:", error.message);
+
+    res.status(503).json({
+      error: "Database is temporarily unavailable",
+    });
+  }
+});
+
 app.use("/api/doctors", doctorRoutes);
 app.use("/api/hospitals", hospitalRoutes);
 app.use("/api/invoices", invoiceRoutes);
 app.use("/api/prescriptions", prescriptionRoutes);
 
-app.get("/api/health", (req, res) => {
-  res.json({ status: "ok", time: new Date().toISOString() });
+// API 404 handler.
+app.use("/api", (req, res) => {
+  res.status(404).json({
+    error: "API endpoint not found",
+  });
 });
 
-// Serve the frontend (static SPA)
-const frontendPath = path.join(__dirname, "..", "frontend");
-app.use(express.static(frontendPath));
-app.get("*", (req, res, next) => {
-  if (req.path.startsWith("/api/")) return next();
-  res.sendFile(path.join(frontendPath, "index.html"));
-});
-
-// Central error handler — catches everything forwarded by asyncHandler()
-// (Mongoose validation/cast errors, duplicate-key errors, etc.) so a bad
-// request or DB hiccup returns a clean JSON error instead of hanging or
-// crashing the process.
+// Central error handler.
 app.use((err, req, res, next) => {
-  console.error(err);
+  console.error("Request error:", err);
+
+  if (res.headersSent) {
+    return next(err);
+  }
 
   if (err.name === "ValidationError") {
-    const message = Object.values(err.errors).map((e) => e.message).join(", ");
-    return res.status(400).json({ error: message || "Validation failed" });
-  }
-  if (err.name === "CastError") {
-    return res.status(404).json({ error: "Not found" });
-  }
-  if (err.code === 11000) {
-    return res.status(409).json({ error: "A record with that value already exists" });
+    const message = Object.values(err.errors || {})
+      .map((item) => item.message)
+      .join(", ");
+
+    return res.status(400).json({
+      error: message || "Validation failed",
+    });
   }
 
-  res.status(500).json({ error: "Something went wrong on the server" });
+  if (err.name === "CastError") {
+    return res.status(404).json({
+      error: "Not found",
+    });
+  }
+
+  if (err.code === 11000) {
+    return res.status(409).json({
+      error: "A record with that value already exists",
+    });
+  }
+
+  res.status(500).json({
+    error: "Something went wrong on the server",
+  });
 });
 
-async function start() {
-  await connectDB();
-  await seedHospitals();
-  app.listen(PORT, () => {
-    console.log(`Doctor Invoice API running on http://localhost:${PORT}`);
-  });
-}
+// Export the Express app for Vercel.
+module.exports = app;
 
-start();
+// Keep local development working.
+if (require.main === module) {
+  const PORT = process.env.PORT || 5000;
+
+  initializeDatabase()
+    .then(() => {
+      app.listen(PORT, () => {
+        console.log(`InvoiceMD API running on port ${PORT}`);
+      });
+    })
+    .catch((error) => {
+      console.error("Failed to start InvoiceMD:", error);
+      process.exit(1);
+    });
+}
